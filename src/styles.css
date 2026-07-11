@@ -1,0 +1,318 @@
+/* ─── Design Tokens (Palantir Dark Theme) ───────────────── */
+:root {
+  --bg: #0b0f19;
+  --panel: #111827;
+  --panel-light: #1f2937;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --border: #374151;
+  --border-light: #4b5563;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --accent: #10b981;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --radius: 6px;
+}
+
+/* ─── Reset & Base ──────────────────────────────────────── */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ────────────────────────────────────────────── */
+.layout { display: flex; height: 100vh; }
+
+.sidebar {
+  width: 420px;
+  min-width: 340px;
+  max-width: 480px;
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Custom Scrollbar */
+.sidebar::-webkit-scrollbar { width: 5px; }
+.sidebar::-webkit-scrollbar-track { background: var(--bg); }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: var(--panel-light); }
+
+.map-wrap { flex: 1; position: relative; }
+#map { position: absolute; inset: 0; }
+
+/* ─── Brand Block ───────────────────────────────────────── */
+.brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.logo { width: 28px; height: 28px; object-fit: contain; }
+.brand-title { font-weight: 800; font-size: 15px; color: var(--text); letter-spacing: -0.02em; text-transform: uppercase; }
+.brand-subtitle { color: var(--muted); font-size: 10px; margin-top: 1px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+
+/* ─── Panels ────────────────────────────────────────────── */
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-top: 14px;
+}
+.panel h2 { 
+  font-size: 10px; 
+  margin: 0 0 12px 0; 
+  font-weight: 700; 
+  text-transform: uppercase; 
+  letter-spacing: 0.08em; 
+  color: var(--muted); 
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Status light badge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* ─── Form Controls ─────────────────────────────────────── */
+label { 
+  display: block; 
+  font-size: 9px; 
+  color: var(--muted); 
+  margin-top: 10px; 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  letter-spacing: 0.06em; 
+}
+select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--text);
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+select:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── Buttons ───────────────────────────────────────────── */
+.btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel-light);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn:hover:not(:disabled) { background: var(--border); border-color: var(--border-light); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── Cards / Metrics Grid ──────────────────────────────── */
+.cards { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.card { 
+  border: 1px solid var(--border); 
+  border-radius: var(--radius); 
+  padding: 10px 12px; 
+  background: var(--panel); 
+}
+.card .title { font-weight: 600; font-size: 12px; color: var(--text); }
+.card .meta { 
+  color: var(--muted); 
+  font-size: 9px; 
+  text-transform: uppercase; 
+  letter-spacing: 0.05em; 
+  font-weight: 600;
+}
+
+/* Tabular row styling for clean values */
+.value-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+.value-num {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ─── Progress Gauges ───────────────────────────────────── */
+.gauge-wrap {
+  margin-top: 6px;
+}
+.gauge-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--muted);
+  font-family: monospace;
+  margin-bottom: 3px;
+}
+.gauge-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--panel-light);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.gauge-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gauge-fill.accent { background: var(--accent); }
+.gauge-fill.primary { background: var(--primary); }
+.gauge-fill.warn { background: var(--warn); }
+.gauge-fill.danger { background: var(--danger); }
+
+/* ─── Chips / Challenges ────────────────────────────────── */
+.chips { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.chips li {
+  background: rgba(245, 158, 11, 0.05);
+  border-left: 2px solid var(--warn);
+  border-top: 1px solid rgba(245, 158, 11, 0.1);
+  border-right: 1px solid rgba(245, 158, 11, 0.1);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 0 4px 4px 0;
+  font-weight: 500;
+}
+
+/* ─── Scheme Cards ──────────────────────────────────────── */
+.scheme-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 12px;
+  transition: border-color 0.15s ease;
+}
+.scheme-card:hover { border-color: var(--border-light); }
+.scheme-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scheme-name { font-weight: 600; font-size: 12px; color: var(--text); }
+.scheme-score { 
+  font-family: monospace;
+  font-weight: 700; 
+  color: var(--accent); 
+  font-size: 12px; 
+}
+.scheme-score.ineligible { color: var(--danger); }
+.scheme-benefit { color: var(--muted); font-size: 11px; margin-top: 4px; line-height: 1.4; }
+
+/* Scheme prioritization bar */
+.scheme-progress {
+  width: 100%;
+  height: 3px;
+  background: var(--panel-light);
+  border-radius: 99px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.scheme-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 99px;
+  transition: width 0.6s ease;
+}
+
+/* ─── Data Sources Footer ───────────────────────────────── */
+.data-sources {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.data-sources strong { color: var(--text); }
+
+/* ─── Map Loading Overlay ───────────────────────────────── */
+.map-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(11, 15, 25, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 10;
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  backdrop-filter: blur(2px);
+}
+.map-loading.hidden { display: none; }
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── Responsive ────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .sidebar { width: 360px; }
+}
+@media (max-width: 860px) {
+  .layout { flex-direction: column; height: auto; }
+  .sidebar { width: 100%; max-width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+  #map { position: relative; height: 50vh; }
+}
+
+/* ─── Hide Mapbox Logo & Attribution Watermarks ────────── */
+.mapboxgl-ctrl-logo { display: none !important; }
+.mapboxgl-ctrl-attrib { display: none !important; }

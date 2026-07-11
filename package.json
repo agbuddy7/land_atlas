@@ -1,0 +1,19 @@
+{
+  "name": "GeoAdhikar-MVP",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "jspdf": "^2.5.1",
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoAdhikar — WebGIS Decision Support System</title>
+  <meta name="description"
+    content="GeoAdhikar: Interactive WebGIS Decision Support System for tribal and rural development scheme prioritization in India." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+</head>
+
+<body>
+  <div id="app" class="layout">
+
+    <!-- ── Sidebar ─────────────────────────────────────── -->
+    <aside id="sidebar" class="sidebar">
+
+      <!-- Brand -->
+      <div class="brand-block">
+        <img src="/logo.png" alt="GeoAdhikar Logo" class="logo" />
+        <div>
+          <div class="brand-title">GeoAdhikar</div>
+          <div class="brand-subtitle">Decision Support System</div>
+        </div>
+      </div>
+
+      <!-- Location Selector -->
+      <div class="panel">
+        <h2>
+          Location Selection
+          <span class="status-badge">
+            <span class="status-dot"></span>
+            Live Bound
+          </span>
+        </h2>
+        <label for="stateSelect">State</label>
+        <select id="stateSelect" aria-label="Select State">
+          <option value="">Select State</option>
+        </select>
+
+        <label for="districtSelect">District</label>
+        <select id="districtSelect" aria-label="Select District" disabled>
+          <option value="">Select District</option>
+        </select>
+
+        <label for="blockSelect">City / Tribal Area</label>
+        <select id="blockSelect" aria-label="Select Area" disabled>
+          <option value="">Select Area</option>
+        </select>
+      </div>
+
+      <!-- Area Profile -->
+      <div id="profilePanel" class="panel">
+        <div class="panel-head">
+          <h2>Area Profile</h2>
+          <button id="downloadPdfBtn" class="btn" disabled>Download Report</button>
+        </div>
+        <div id="profileList" class="cards" style="margin-top: 10px;"></div>
+      </div>
+
+      <!-- Key Challenges -->
+      <div id="challengesPanel" class="panel">
+        <h2>Identified Challenges</h2>
+        <ul id="challengesList" class="chips"></ul>
+      </div>
+
+      <!-- Recommended Schemes -->
+      <div id="recoPanel" class="panel">
+        <h2>Prioritized Scheme Interventions</h2>
+        <div id="recommendations" class="cards"></div>
+      </div>
+
+      <!-- Data Sources Footer 
+      <div class="data-sources">
+        <strong>Data Sources:</strong><br>
+        Census of India 2011 ·
+        Forest Survey of India ISFR ·
+        Jal Jeevan Mission Dashboard ·
+        Swachh Bharat Mission ·
+        Ministry of Tribal Affairs<br>
+        <span style="color:#64748b;margin-top:4px;display:block;">Research prototype — for academic demonstration purposes only.</span>
+      </div>-->
+
+    </aside>
+
+    <!-- ── Map ────────────────────────────────────────── -->
+    <main class="map-wrap">
+      <!-- Map loading overlay -->
+      <div id="mapLoadingOverlay" class="map-loading">
+        <div class="spinner" style="width:36px;height:36px;border-width:4px;"></div>
+        <span>Initializing WebGIS Decision Support System</span>
+        <small style="color:#4b5563;">Loading spatial datasets &amp; boundary layers...</small>
+      </div>
+      <div id="map" aria-label="Interactive Map of India"></div>
+    </main>
+
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
