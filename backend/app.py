@@ -8,9 +8,14 @@ import cv2
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from shapely.geometry import Polygon, MultiPolygon
+from shapely.validation import make_valid
 
 # Initialize FastAPI App
-app = FastAPI(title="GeoAdhikar SAM Plot Segmentation API", version="1.0.0")
+app = FastAPI(
+    title="GeoAdhikar YOLOv8 + Prompted SAM Plot Segmentation API",
+    version="2.0.0"
+)
 
 # Enable CORS for Vite frontend
 app.add_middleware(
@@ -21,18 +26,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load SAM model (FastSAM / MobileSAM via Ultralytics)
+# Global models
+yolo_model = None
 sam_model = None
 
-def get_model():
+def get_yolo():
+    global yolo_model
+    if yolo_model is None:
+        try:
+            from ultralytics import YOLO
+            print("🚀 Loading YOLOv8 candidate detector...")
+            yolo_model = YOLO("yolov8n.pt")
+            print("✅ YOLOv8 loaded successfully!")
+        except Exception as e:
+            print(f"⚠️ Failed to load YOLOv8: {e}")
+    return yolo_model
+
+def get_sam():
     global sam_model
     if sam_model is None:
         try:
             from ultralytics import FastSAM
-            print("🚀 Loading FastSAM model for plot segmentation...")
-            # FastSAM-s is lightweight (40MB), runs smoothly on CPU
+            print("🚀 Loading FastSAM promptable segmentation model...")
             sam_model = FastSAM("FastSAM-s.pt")
-            print("✅ FastSAM model loaded successfully!")
+            print("✅ FastSAM loaded successfully!")
         except Exception as e:
             print(f"⚠️ Failed to load FastSAM: {e}")
     return sam_model
@@ -53,10 +70,8 @@ def pixel_to_gps(px, py, bbox, img_width=512, img_height=512):
 def calculate_polygon_area_sqm(coordinates, lat_ref):
     """
     Computes approximate metric area (in sq meters) for a geographic polygon
-    at a given latitude using the Shoelace formula projected to meters.
+    at a given latitude using the Shoelace formula projected to metric meters.
     """
-    # 1 degree of latitude approx 111,139 meters
-    # 1 degree of longitude approx 111,139 * cos(lat) meters
     m_per_deg_lat = 111139.0
     m_per_deg_lng = 111139.0 * math.cos(math.radians(lat_ref))
 
@@ -64,7 +79,6 @@ def calculate_polygon_area_sqm(coordinates, lat_ref):
     if len(ring) < 3:
         return 0.0
 
-    # Project to metric meters relative to first vertex
     ref_lng, ref_lat = ring[0]
     pts = []
     for lng, lat in ring:
@@ -72,7 +86,6 @@ def calculate_polygon_area_sqm(coordinates, lat_ref):
         y = (lat - ref_lat) * m_per_deg_lat
         pts.append((x, y))
 
-    # Shoelace formula
     n = len(pts)
     area = 0.0
     for i in range(n):
@@ -85,19 +98,25 @@ def calculate_polygon_area_sqm(coordinates, lat_ref):
 def classify_plot_type(roi_rgb):
     """
     Classifies plot type using vegetation/soil spectral index in RGB.
+    Safely handles both 2D (N, 3) and 3D (H, W, 3) arrays.
     """
     if roi_rgb.size == 0:
         return "Unclassified", "#9ca3af"
 
-    r = np.mean(roi_rgb[:, :, 0])
-    g = np.mean(roi_rgb[:, :, 1])
-    b = np.mean(roi_rgb[:, :, 2])
+    if len(roi_rgb.shape) == 2:
+        r = float(np.mean(roi_rgb[:, 0]))
+        g = float(np.mean(roi_rgb[:, 1]))
+        b = float(np.mean(roi_rgb[:, 2]))
+    else:
+        r = float(np.mean(roi_rgb[:, :, 0]))
+        g = float(np.mean(roi_rgb[:, :, 1]))
+        b = float(np.mean(roi_rgb[:, :, 2]))
 
     # Visible Atmospherically Resistant Index (VARI) for greenness
     denom = (g + r - b)
     vari = (g - r) / denom if denom != 0 else 0.0
 
-    # Brightness
+    # Overall brightness
     brightness = (r + g + b) / 3.0
 
     # Water: low red, higher blue/green, low overall brightness
@@ -119,8 +138,131 @@ def classify_plot_type(roi_rgb):
     # Default to Fallow / Barren Soil
     return "Fallow / Barren Land", "#f59e0b"
 
+# ─── Box Intersection over Union (IoU) Helper ──────────────────────────────────
+def compute_box_iou(box1, box2):
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+    inter_area = max(0, x2 - x1) * max(0, y2 - y1)
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union_area = area1 + area2 - inter_area
+    return inter_area / union_area if union_area > 0 else 0.0
+
+# ─── Candidate Prompt Generation (YOLOv8 + Salient Open Plots) ────────────────
+def generate_candidate_prompt_boxes(np_img, min_box_dim=28, min_box_area=800):
+    """
+    Generates candidate bounding boxes from:
+    1. YOLOv8 detector (for structures, rooftops, objects)
+    2. Salient edge/texture regional components (for open parcels/agricultural fields)
+    3. Non-Maximum Suppression to avoid overlapping duplicates
+    """
+    h, w, _ = np_img.shape
+    candidates = []
+
+    # 1. Run YOLOv8 detection
+    yolo = get_yolo()
+    if yolo is not None:
+        try:
+            yolo_res = yolo(np_img, conf=0.12, imgsz=512, verbose=False)
+            if yolo_res and len(yolo_res) > 0 and yolo_res[0].boxes is not None:
+                for box in yolo_res[0].boxes.xyxy.cpu().numpy():
+                    x1, y1, x2, y2 = [int(v) for v in box]
+                    bw = x2 - x1
+                    bh = y2 - y1
+                    if bw >= min_box_dim and bh >= min_box_dim and (bw * bh) >= min_box_area:
+                        candidates.append([x1, y1, x2, y2])
+        except Exception as e:
+            print(f"YOLO candidate error: {e}")
+
+    # 2. Extract salient open parcel boundaries (agricultural fields, open plots)
+    try:
+        gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
+        blurred = cv2.bilateralFilter(gray, 7, 50, 50)
+        edges = cv2.Canny(blurred, 35, 100)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+        contours, _ = cv2.findContours(closed_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            # Must be a substantial parcel region (not tiny noise, not whole image)
+            if area >= (min_box_area * 1.5) and area < (w * h * 0.85):
+                x, y, bw, bh = cv2.boundingRect(cnt)
+                if bw >= min_box_dim and bh >= min_box_dim:
+                    candidates.append([x, y, x + bw, y + bh])
+    except Exception as e:
+        print(f"Open parcel extraction error: {e}")
+
+    # If too few candidates, generate regular grid prompt boxes
+    if len(candidates) < 4:
+        step = 160
+        for y in range(16, h - 80, step):
+            for x in range(16, w - 80, step):
+                candidates.append([x, y, min(w - 16, x + step), min(h - 16, y + step)])
+
+    # 3. Non-Maximum Suppression (NMS) to eliminate duplicate overlapping boxes
+    candidates.sort(key=lambda b: (b[2] - b[0]) * (b[3] - b[1]), reverse=True)
+    kept_boxes = []
+    for b in candidates:
+        if any(compute_box_iou(b, kb) > 0.35 for kb in kept_boxes):
+            continue
+        kept_boxes.append(b)
+
+    # Limit to top 20 candidate parcels per tile
+    return kept_boxes[:20]
+
+# ─── 4-Sided Shape Regularization (Rectangle / Quadrilateral Favoring) ────────
+def regularize_polygon_contour(cnt, extent_threshold=0.60):
+    """
+    Enforces regular 4-sided shapes (rectangles/squares/quads) for cadastral parcels:
+    - If contour is predominantly rectangular (extent >= 0.60), returns minimum rotated rectangle (4 points).
+    - Otherwise, simplifies contour to 4-6 dominant vertices with Douglas-Peucker.
+    """
+    # 1. Minimum rotated bounding rectangle
+    rect = cv2.minAreaRect(cnt)
+    box = cv2.boxPoints(rect)  # 4 points
+    box_area = cv2.contourArea(box)
+    cnt_area = cv2.contourArea(cnt)
+
+    extent = (cnt_area / box_area) if box_area > 0 else 0.0
+
+    # If it is mostly rectangular, snap to the clean 4-sided minimum rotated rectangle
+    if extent >= extent_threshold:
+        pts = box.astype(np.int32)
+        return [[int(p[0]), int(p[1])] for p in pts]
+
+    # Otherwise, simplify with Douglas-Peucker to produce 4 to 6 clean vertices
+    peri = cv2.arcLength(cnt, True)
+    for eps_factor in [0.035, 0.025, 0.015, 0.01]:
+        approx = cv2.approxPolyDP(cnt, eps_factor * peri, True)
+        if 4 <= len(approx) <= 6:
+            return [[int(p[0][0]), int(p[0][1])] for p in approx]
+
+    # Fallback to standard approximation (at least 4 points)
+    approx = cv2.approxPolyDP(cnt, 0.02 * peri, True)
+    if len(approx) < 4:
+        pts = box.astype(np.int32)
+        return [[int(p[0]), int(p[1])] for p in pts]
+
+    return [[int(p[0][0]), int(p[0][1])] for p in approx]
+
 # ─── Core Segmentation Function ───────────────────────────────────────────────
-def segment_image_plots(image_bytes: bytes, bbox: List[float], cell_id: str = "A1"):
+def segment_image_plots(
+    image_bytes: bytes,
+    bbox: List[float],
+    cell_id: str = "A1",
+    min_area_sqm: float = 80.0
+):
+    """
+    Executes:
+    1. YOLOv8 candidate detection -> prompt bounding boxes
+    2. Prompted FastSAM segmentation
+    3. 4-sided cadastral regularisation (square/rectangle favoring)
+    4. Topological cleaning via Shapely make_valid (zero self-intersections / no diagonal lines)
+    5. Minimum parcel area filtering (min_area_sqm >= 80m²)
+    """
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     np_img = np.array(image)
     h, w, _ = np_img.shape
@@ -129,140 +271,134 @@ def segment_image_plots(image_bytes: bytes, bbox: List[float], cell_id: str = "A
     center_lat = (min_lat + max_lat) / 2.0
 
     features = []
-    model = get_model()
+    sam = get_sam()
 
-    if model is not None:
+    # Step 1: Generate clean candidate prompt boxes using YOLOv8
+    prompt_boxes = generate_candidate_prompt_boxes(np_img)
+    print(f"📦 Generated {len(prompt_boxes)} candidate prompt boxes for tile {cell_id}")
+
+    raw_masks = []
+    if sam is not None and len(prompt_boxes) > 0:
         try:
-            # Run FastSAM inference
-            results = model(
+            # Run FastSAM in PROMPTED mode with candidate boxes
+            results = sam(
                 np_img,
+                bboxes=prompt_boxes,
                 device="cpu",
-                retina_masks=True,
                 imgsz=512,
-                conf=0.25,
-                iou=0.6
+                conf=0.20,
+                retina_masks=True,
+                verbose=False
             )
 
             if results and len(results) > 0 and results[0].masks is not None:
-                masks_data = results[0].masks.data.cpu().numpy() # shape (N, H, W)
-                
-                plot_idx = 1
+                masks_data = results[0].masks.data.cpu().numpy()
                 for i in range(len(masks_data)):
-                    mask = (masks_data[i] * 255).astype(np.uint8)
-                    mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
-
-                    # Find external contours
-                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                    for cnt in contours:
-                        # Filter out tiny noise (less than 60 pixels)
-                        pixel_area = cv2.contourArea(cnt)
-                        if pixel_area < 120:
-                            continue
-
-                        # Approximate polygon to reduce coordinates
-                        epsilon = 0.008 * cv2.arcLength(cnt, True)
-                        approx = cv2.approxPolyDP(cnt, epsilon, True)
-
-                        if len(approx) < 3:
-                            continue
-
-                        # Convert pixel points to GPS coordinates
-                        gps_ring = []
-                        for pt in approx:
-                            px, py = pt[0]
-                            gps_ring.append(pixel_to_gps(px, py, bbox, w, h))
-
-                        # Close ring
-                        if gps_ring[0] != gps_ring[-1]:
-                            gps_ring.append(gps_ring[0])
-
-                        # Calculate metric area
-                        area_sqm = calculate_polygon_area_sqm([gps_ring], center_lat)
-                        if area_sqm < 25.0: # ignore fragments smaller than 25 sq meters
-                            continue
-
-                        # Mask ROI for classification
-                        mask_bool = mask > 0
-                        roi = np_img[mask_bool]
-                        plot_type, color = classify_plot_type(roi)
-
-                        plot_id = f"PL_{cell_id}_{plot_idx:02d}"
-                        plot_idx += 1
-
-                        features.append({
-                            "type": "Feature",
-                            "properties": {
-                                "plot_id": plot_id,
-                                "cell_id": cell_id,
-                                "land_type": plot_type,
-                                "color": color,
-                                "area_sq_m": round(area_sqm, 1),
-                                "area_hectares": round(area_sqm / 10000.0, 4),
-                                "area_acres": round(area_sqm * 0.000247105, 3),
-                                "perimeter_m": round(cv2.arcLength(cnt, True) * (max_lng - min_lng) / w * 111139.0, 1)
-                            },
-                            "geometry": {
-                                "type": "Polygon",
-                                "coordinates": [gps_ring]
-                            }
-                        })
+                    m = (masks_data[i] * 255).astype(np.uint8)
+                    m = cv2.resize(m, (w, h), interpolation=cv2.INTER_NEAREST)
+                    raw_masks.append(m)
         except Exception as e:
-            print(f"Error during SAM inference: {e}")
+            print(f"⚠️ Error during prompted SAM inference: {e}")
 
-    # Fallback to OpenCV Contour / Watershed segmentation if model produced too few plots
-    if len(features) < 2:
-        print("Falling back to OpenCV Spectral Contour segmentation...")
-        gray = cv2.cvtColor(np_img, cv2.COLOR_RGB2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 30, 120)
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        dilated = cv2.dilate(edges, kernel, iterations=1)
-        contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # Fallback to prompt boxes if SAM produces no masks
+    if len(raw_masks) == 0:
+        for b in prompt_boxes:
+            m = np.zeros((h, w), dtype=np.uint8)
+            cv2.rectangle(m, (b[0], b[1]), (b[2], b[3]), 255, -1)
+            raw_masks.append(m)
 
-        plot_idx = 1
-        for cnt in contours:
-            pixel_area = cv2.contourArea(cnt)
-            if pixel_area < 250 or pixel_area > (w * h * 0.9):
+    # Step 2: Process masks into clean 4-sided cadastral plots
+    plot_idx = 1
+    existing_polygons = []
+
+    for mask in raw_masks:
+        # Morphological closing to eliminate internal holes
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        smoothed_mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+        contours, _ = cv2.findContours(smoothed_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            continue
+
+        # Get largest contour
+        cnt = max(contours, key=cv2.contourArea)
+        if cv2.contourArea(cnt) < 500:  # Skip tiny pixel noise
+            continue
+
+        # Regularize into 4-sided shape (rectangle/square/quad)
+        reg_pts = regularize_polygon_contour(cnt, extent_threshold=0.60)
+
+        # Convert to GPS ring
+        gps_ring = [pixel_to_gps(px, py, bbox, w, h) for px, py in reg_pts]
+        if gps_ring[0] != gps_ring[-1]:
+            gps_ring.append(gps_ring[0])
+
+        # Step 3: Shapely Topological Validation (Prevents Mapbox Earcut diagonal triangles!)
+        try:
+            poly = Polygon(gps_ring)
+            if not poly.is_valid:
+                poly = make_valid(poly)
+
+            # If it split into MultiPolygon, select the largest polygon component
+            if isinstance(poly, MultiPolygon):
+                poly = max(poly.geoms, key=lambda g: g.area)
+
+            # Simplify with topology preservation
+            poly = poly.simplify(0.00001, preserve_topology=True)
+
+            # Extract clean exterior coordinates
+            clean_coords = list(poly.exterior.coords)
+            if len(clean_coords) < 4:
                 continue
+        except Exception as e:
+            print(f"Topology cleanup error: {e}")
+            continue
 
-            epsilon = 0.01 * cv2.arcLength(cnt, True)
-            approx = cv2.approxPolyDP(cnt, epsilon, True)
-            if len(approx) < 3:
-                continue
+        # Calculate metric area
+        area_sqm = calculate_polygon_area_sqm([clean_coords], center_lat)
+        if area_sqm < min_area_sqm:
+            continue
 
-            gps_ring = [pixel_to_gps(pt[0][0], pt[0][1], bbox, w, h) for pt in approx]
-            if gps_ring[0] != gps_ring[-1]:
-                gps_ring.append(gps_ring[0])
+        # Non-Maximum Suppression: Discard if overlapping heavily with an existing plot
+        curr_poly_shape = Polygon(clean_coords)
+        has_large_overlap = False
+        for ep in existing_polygons:
+            if curr_poly_shape.intersects(ep):
+                inter = curr_poly_shape.intersection(ep).area
+                if inter / curr_poly_shape.area > 0.40:
+                    has_large_overlap = True
+                    break
+        if has_large_overlap:
+            continue
 
-            area_sqm = calculate_polygon_area_sqm([gps_ring], center_lat)
-            if area_sqm < 30.0:
-                continue
+        existing_polygons.append(curr_poly_shape)
 
-            # Classify using bounding box pixels
-            x, y, cw, ch = cv2.boundingRect(cnt)
-            roi = np_img[y:y+ch, x:x+cw]
-            plot_type, color = classify_plot_type(roi)
+        # Classify land cover safely using ROI pixels
+        mask_bool = smoothed_mask > 0
+        roi = np_img[mask_bool]
+        plot_type, color = classify_plot_type(roi)
 
-            plot_id = f"PL_{cell_id}_{plot_idx:02d}"
-            plot_idx += 1
+        plot_id = f"PL_{cell_id}_{plot_idx:02d}"
+        plot_idx += 1
 
-            features.append({
-                "type": "Feature",
-                "properties": {
-                    "plot_id": plot_id,
-                    "cell_id": cell_id,
-                    "land_type": plot_type,
-                    "color": color,
-                    "area_sq_m": round(area_sqm, 1),
-                    "area_hectares": round(area_sqm / 10000.0, 4),
-                    "area_acres": round(area_sqm * 0.000247105, 3),
-                    "perimeter_m": round(cv2.arcLength(cnt, True) * (max_lng - min_lng) / w * 111139.0, 1)
-                },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [gps_ring]
-                }
-            })
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "plot_id": plot_id,
+                "cell_id": cell_id,
+                "land_type": plot_type,
+                "color": color,
+                "area_sq_m": round(area_sqm, 1),
+                "area_hectares": round(area_sqm / 10000.0, 4),
+                "area_acres": round(area_sqm * 0.000247105, 3),
+                "vertices": len(clean_coords) - 1,
+                "shape_type": "4-Sided Quadrilateral/Rectangle" if (len(clean_coords) - 1) == 4 else f"{len(clean_coords)-1}-Gon Parcel"
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [clean_coords]
+            }
+        })
 
     return {
         "type": "FeatureCollection",
@@ -274,20 +410,23 @@ def segment_image_plots(image_bytes: bytes, bbox: List[float], cell_id: str = "A
 def health_check():
     return {
         "status": "healthy",
-        "model": "FastSAM (Segment Anything)" if sam_model else "Initializing",
-        "backend": "PyTorch CPU"
+        "detector": "YOLOv8n",
+        "segmenter": "FastSAM (Prompted Mode)",
+        "regularization": "4-Sided Rectangle/Quad Enforced",
+        "topology_cleaner": "Shapely make_valid"
     }
 
 @app.post("/segment")
 async def segment_single(
     image: UploadFile = File(...),
     bbox: str = Form(...),  # "[minLng, minLat, maxLng, maxLat]"
-    cell_id: str = Form("A1")
+    cell_id: str = Form("A1"),
+    min_area_sqm: float = Form(80.0)
 ):
     try:
         bbox_list = json.loads(bbox)
         contents = await image.read()
-        geojson_result = segment_image_plots(contents, bbox_list, cell_id)
+        geojson_result = segment_image_plots(contents, bbox_list, cell_id, min_area_sqm)
         return geojson_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -296,6 +435,7 @@ class BatchPatchItem(BaseModel):
     cell_id: str
     bbox: List[float]
     image_base64: str
+    min_area_sqm: Optional[float] = 80.0
 
 class BatchSegmentRequest(BaseModel):
     patches: List[BatchPatchItem]
@@ -307,13 +447,13 @@ async def segment_batch(request: BatchSegmentRequest):
 
     for patch in request.patches:
         try:
-            # Decode base64 image data
             img_data = patch.image_base64
             if "," in img_data:
                 img_data = img_data.split(",")[1]
             img_bytes = base64.b64decode(img_data)
 
-            res = segment_image_plots(img_bytes, patch.bbox, patch.cell_id)
+            min_area = patch.min_area_sqm if patch.min_area_sqm is not None else 80.0
+            res = segment_image_plots(img_bytes, patch.bbox, patch.cell_id, min_area)
             all_features.extend(res.get("features", []))
         except Exception as e:
             print(f"Error processing patch {patch.cell_id}: {e}")
@@ -326,6 +466,7 @@ async def segment_batch(request: BatchSegmentRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # Pre-warm model
-    get_model()
+    # Pre-warm models
+    get_yolo()
+    get_sam()
     uvicorn.run(app, host="127.0.0.1", port=8000)
