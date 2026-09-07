@@ -42,6 +42,52 @@ class LandRecord(BaseModel):
         default=None, 
         description="Complete transcription of every word. Will be null if using fallback model."
     )
+    parsed_area_sqm: Optional[float] = None
+    parsed_area_ha: Optional[float] = None
+    parsed_area_acres: Optional[float] = None
+    ai_provider: Optional[str] = None
+
+def parse_area_string(area_str: str):
+    if not area_str or area_str.strip().upper() in ["N/A", "NONE", "NULL", ""]:
+        return {"sqm": None, "hectares": None, "acres": None}
+    
+    match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z\.\s\/\^0-9]+)?", area_str)
+    if not match:
+        return {"sqm": None, "hectares": None, "acres": None}
+    
+    val = float(match.group(1))
+    unit = (match.group(2) or "").lower().strip()
+    
+    sqm = None
+    if any(u in unit for u in ["hectare", "ha", "hac"]):
+        sqm = val * 10000.0
+    elif any(u in unit for u in ["acre", "ac"]):
+        sqm = val * 4046.86
+    elif any(u in unit for u in ["bigha", "vighe", "vigha"]):
+        sqm = val * 2529.285
+    elif any(u in unit for u in ["guntha", "gunta"]):
+        sqm = val * 101.17
+    elif any(u in unit for u in ["biswa"]):
+        sqm = val * 125.0
+    elif any(u in unit for u in ["sq ft", "square feet", "sqft"]):
+        sqm = val * 0.092903
+    elif any(u in unit for u in ["sq m", "sqm", "sq meter", "meter", "m2", "m²"]):
+        sqm = val
+    elif any(u in unit for u in ["gaj", "yard", "sq yard"]):
+        sqm = val * 0.836127
+    else:
+        # Default: if value <= 50, typically hectares in Indian 7/12 land records
+        if val <= 50.0:
+            sqm = val * 10000.0
+        else:
+            sqm = val
+            
+    return {
+        "sqm": round(sqm, 2) if sqm else None,
+        "hectares": round(sqm / 10000.0, 4) if sqm else None,
+        "acres": round(sqm * 0.000247105, 4) if sqm else None
+    }
+
 
 def encode_image(image_path: str) -> str:
     """Helper to convert image to base64 for Groq."""
@@ -79,7 +125,13 @@ def extract_record(image_path: str) -> LandRecord:
                 temperature=0.0
             ),
         )
-        return LandRecord.model_validate_json(response.text)
+        rec = LandRecord.model_validate_json(response.text)
+        area_info = parse_area_string(rec.total_area)
+        rec.parsed_area_sqm = area_info["sqm"]
+        rec.parsed_area_ha = area_info["hectares"]
+        rec.parsed_area_acres = area_info["acres"]
+        rec.ai_provider = "Google Gemini"
+        return rec
 
     except Exception as e:
         print(f"⚠️ Gemini failed: {e}\n⏳ Falling back to Groq LLaVA Vision...")
@@ -146,7 +198,13 @@ def extract_record(image_path: str) -> LandRecord:
     
     if start_idx != -1 and end_idx > start_idx:
         cleaned_content = raw_content[start_idx:end_idx+1]
-        return LandRecord.model_validate_json(cleaned_content)
+        rec = LandRecord.model_validate_json(cleaned_content)
+        area_info = parse_area_string(rec.total_area)
+        rec.parsed_area_sqm = area_info["sqm"]
+        rec.parsed_area_ha = area_info["hectares"]
+        rec.parsed_area_acres = area_info["acres"]
+        rec.ai_provider = "Groq Vision"
+        return rec
     else:
         # SAFETY NET: If the model ran out of tokens panicking over an invalid image,
         # we catch it here and return a hardcoded "N/A" record instead of crashing.
