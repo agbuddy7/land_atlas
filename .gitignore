@@ -7,3 +7,5 @@ delete/
 __pycache__/
 *.pyc
 .env
+
+
