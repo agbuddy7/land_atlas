@@ -1,16 +1,25 @@
 import io
 import json
 import math
+import os
+import re
+import base64
 import traceback
+import urllib.request
+import urllib.parse
 from typing import List, Optional
 import numpy as np
 from PIL import Image
 import cv2
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from shapely.geometry import Polygon, MultiPolygon
 from shapely.validation import make_valid
+
+# Load environment variables
+load_dotenv()
 
 # Initialize FastAPI App
 app = FastAPI(
@@ -642,6 +651,95 @@ async def segment_batch(request: BatchSegmentRequest):
         "type": "FeatureCollection",
         "features": all_features,
         "total_plots": len(all_features)
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LAND RECORD OCR & GEOCODING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from ocr import extract_record
+
+@app.post("/ocr")
+async def perform_ocr(
+    image: UploadFile = File(...)
+):
+    try:
+        # Save uploaded image to a temporary file
+        temp_image_path = "temp_uploaded_document.jpg"
+        with open(temp_image_path, "wb") as f:
+            f.write(await image.read())
+
+        # Call extract_record directly from ocr.py
+        record = extract_record(temp_image_path)
+        
+        # Save to extracted_record.json just like ocr.py does
+        output_file = "extracted_record.json"
+        with open(output_file, "w", encoding="utf-8") as f:
+            f.write(record.model_dump_json(indent=4))
+            
+        return record.model_dump()
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class GeocodeRecordRequest(BaseModel):
+    state: Optional[str] = ""
+    district: Optional[str] = ""
+    taluka_or_tehsil: Optional[str] = ""
+    village: Optional[str] = ""
+    survey_or_gat_no: Optional[str] = ""
+    query: Optional[str] = ""
+
+@app.post("/geocode-record")
+def geocode_record(req: GeocodeRecordRequest):
+    token = os.environ.get("VITE_MAPBOX_TOKEN", "")
+    
+    parts = []
+    if req.village and req.village != "N/A":
+        parts.append(req.village)
+    if req.taluka_or_tehsil and req.taluka_or_tehsil != "N/A":
+        parts.append(req.taluka_or_tehsil)
+    if req.district and req.district != "N/A":
+        parts.append(req.district)
+    if req.state and req.state != "N/A":
+        parts.append(req.state)
+        
+    query_str = req.query.strip() if req.query else ", ".join(parts)
+    if not query_str:
+        query_str = "Maharashtra, India"
+
+    encoded_q = urllib.parse.quote(query_str)
+    url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{encoded_q}.json?access_token={token}&country=in&limit=1"
+
+    try:
+        req_obj = urllib.request.Request(url, headers={"User-Agent": "GeoAdhikar/3.0"})
+        with urllib.request.urlopen(req_obj, timeout=6) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            if data.get("features") and len(data["features"]) > 0:
+                feat = data["features"][0]
+                lng, lat = feat["center"]
+                bbox = feat.get("bbox", [lng - 0.005, lat - 0.005, lng + 0.005, lat + 0.005])
+                return {
+                    "success": True,
+                    "query": query_str,
+                    "place_name": feat.get("place_name", query_str),
+                    "coordinates": [lng, lat],
+                    "bbox": bbox
+                }
+    except Exception as e:
+        print(f"Geocoding error: {e}")
+
+    # Default fallback
+    return {
+        "success": False,
+        "query": query_str,
+        "place_name": query_str,
+        "coordinates": [73.8567, 18.5204],
+        "bbox": [73.8167, 18.4804, 73.8967, 18.5604],
+        "message": "Mapbox geocoding failed or token missing, defaulted to region center."
     }
 
 if __name__ == "__main__":

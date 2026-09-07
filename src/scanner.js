@@ -1108,3 +1108,44 @@ export function exportPlotsCsv() {
   document.body.removeChild(a);
 }
 
+// ─── Integration Hooks for Land Records Module ─────────────────────────────────
+export function getSegmentedPlots() {
+  return segmentedPlotsData;
+}
+
+export function highlightMatchedPlots(plotIds = []) {
+  if (!mapInstance || !mapInstance.getLayer('segmented-plots-line')) return;
+  if (plotIds.length === 0) {
+    mapInstance.setPaintProperty('segmented-plots-line', 'line-color', '#ffffff');
+    mapInstance.setPaintProperty('segmented-plots-line', 'line-width', 1.8);
+    return;
+  }
+  mapInstance.setPaintProperty('segmented-plots-line', 'line-color', [
+    'case',
+    ['in', ['get', 'plot_id'], ['literal', plotIds]],
+    '#fbbf24', // bright gold
+    '#ffffff'
+  ]);
+  mapInstance.setPaintProperty('segmented-plots-line', 'line-width', [
+    'case',
+    ['in', ['get', 'plot_id'], ['literal', plotIds]],
+    4.0,
+    1.8
+  ]);
+}
+
+export function zoomToPlot(plotId) {
+  if (!mapInstance || !segmentedPlotsData || !segmentedPlotsData.features) return;
+  const feat = segmentedPlotsData.features.find(f => f.properties.plot_id === plotId);
+  if (!feat) return;
+
+  const bbox = turf.bbox(feat);
+  mapInstance.fitBounds(bbox, {
+    padding: { top: 120, bottom: 120, left: 450, right: 120 },
+    maxZoom: 19.5,
+    duration: 1400
+  });
+  displaySelectedPlot(feat.properties);
+  highlightMatchedPlots([plotId]);
+}
+

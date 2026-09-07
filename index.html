@@ -35,10 +35,13 @@
       <!-- Navigation Mode Tabs -->
       <div class="mode-tabs">
         <button id="tabDSS" class="mode-tab active" type="button">
-          <span>🌐</span> Scheme Prioritization
+          <span>🌐</span> Schemes
         </button>
         <button id="tabScanner" class="mode-tab" type="button">
-          <span>🛰️</span> Plot Snapshot Scanner
+          <span>🛰️</span> Scanner
+        </button>
+        <button id="tabRecords" class="mode-tab" type="button">
+          <span>📜</span> Records
         </button>
       </div>
 
@@ -251,6 +254,178 @@
 
           <!-- Segmented Plots List -->
           <div id="plotsList" class="cards" style="margin-top: 10px; max-height: 240px; overflow-y: auto;"></div>
+        </div>
+      </div>
+
+      <!-- ── View 3: Land Records OCR & Record Book ─────────────── -->
+      <div id="recordsContainer" class="mode-view" style="display: none;">
+        <!-- Document Upload Panel -->
+        <div class="panel">
+          <h2>
+            Land Document AI OCR
+            <span class="status-badge" style="color: #fbbf24; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.2);">
+              <span class="status-dot" style="background: #fbbf24;"></span>
+              7/12 &amp; RoR Vision
+            </span>
+          </h2>
+
+          <div id="ocrDropzone" class="ocr-dropzone">
+            <input type="file" id="ocrFileInput" accept="image/*,application/pdf" style="display: none;" />
+            <div class="dropzone-icon">📄</div>
+            <div class="dropzone-text"><strong>Upload Land Record / 7/12 Sheet</strong></div>
+            <div class="dropzone-sub">Drag &amp; drop document image or click to browse</div>
+            <img id="ocrFilePreview" class="ocr-preview-thumb" style="display: none;" alt="Preview" />
+            <div id="ocrFileName" class="ocr-file-name"></div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button id="btnStartOcr" class="btn btn-primary" style="flex: 1; font-weight: 700;" disabled type="button">
+              🧠 Run AI OCR Extraction
+            </button>
+            <button id="btnLoadSampleRecord" class="btn btn-secondary btn-sm" type="button" title="Load sample 7/12 land record">
+              📋 Load Sample
+            </button>
+          </div>
+
+          <!-- Progress -->
+          <div id="ocrStatus" class="progress-container" style="display: none; margin-top: 10px;">
+            <div class="progress-track">
+              <div class="progress-bar progress-bar-indeterminate" style="background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+            </div>
+            <div id="ocrStatusText" class="progress-text">Extracting metadata with Vision AI...</div>
+          </div>
+        </div>
+
+        <!-- OCR Results Card -->
+        <div id="ocrResultPanel" class="panel" style="display: none;">
+          <div class="panel-head">
+            <h2>
+              Extracted Land Record
+              <span id="recAiProviderBadge" class="counter-badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-color: rgba(59, 130, 246, 0.3);">
+                AI Extracted
+              </span>
+            </h2>
+          </div>
+
+          <!-- Location Hierarchy -->
+          <div class="rec-loc-banner" style="margin-top: 8px;">
+            <span id="recVillage" class="loc-tag village-tag">Village</span>
+            <span id="recTaluka" class="loc-tag">Taluka</span>
+            <span id="recDistrict" class="loc-tag">District</span>
+            <span id="recState" class="loc-tag">State</span>
+          </div>
+
+          <!-- Grid of Key Fields -->
+          <div class="rec-grid" style="margin-top: 10px;">
+            <div class="rec-stat-card">
+              <div class="rec-stat-label">Survey / Gat No.</div>
+              <div id="recSurveyNo" class="rec-stat-val" style="color: #60a5fa;">-</div>
+            </div>
+            <div class="rec-stat-card">
+              <div class="rec-stat-label">Khata No.</div>
+              <div id="recKhataNo" class="rec-stat-val" style="color: #a78bfa;">-</div>
+            </div>
+            <div class="rec-stat-card" style="grid-column: span 2;">
+              <div class="rec-stat-label">Stated Total Area</div>
+              <div id="recTotalArea" class="rec-stat-val" style="color: #34d399; font-size: 15px;">-</div>
+              <div id="recAreaBreakdown" style="font-size: 10px; color: var(--muted); margin-top: 2px;"></div>
+            </div>
+          </div>
+
+          <!-- Owners -->
+          <div style="margin-top: 10px;">
+            <label class="field-section-label">Registered Title Owners</label>
+            <div id="recOwnersList" class="owners-wrap" style="margin-top: 4px;"></div>
+          </div>
+
+          <!-- Liabilities / Loans -->
+          <div style="margin-top: 10px;">
+            <label class="field-section-label">Encumbrances &amp; Bank Loans</label>
+            <div id="recLiabilitiesList" class="liabilities-wrap" style="margin-top: 4px;"></div>
+          </div>
+
+          <!-- Summary -->
+          <div style="margin-top: 10px;">
+            <label class="field-section-label">Legal &amp; Ownership Summary</label>
+            <p id="recSummary" class="rec-summary-text"></p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="rec-action-group" style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+            <button id="btnNavLocation" class="btn btn-primary" type="button" style="font-weight: 600;">
+              🗺️ Navigate Map to Location
+            </button>
+            <div style="display: flex; gap: 6px;">
+              <button id="btnMatchArea" class="btn btn-accent btn-sm" type="button" style="flex: 1; font-weight: 600;">
+                🔍 Match Stated Area with Plots
+              </button>
+              <button id="btnSaveToBook" class="btn btn-secondary btn-sm" type="button" style="flex: 1; font-weight: 600;">
+                💾 Save to Record Book
+              </button>
+            </div>
+          </div>
+
+          <!-- Raw Transcription Accordion -->
+          <details style="margin-top: 12px; font-size: 11px;">
+            <summary style="cursor: pointer; color: var(--muted); font-weight: 600;">
+              📜 View Full Raw Transcription
+            </summary>
+            <pre id="recRawText" class="rec-raw-box"></pre>
+          </details>
+        </div>
+
+        <!-- Cadastral Plot Area Match Results -->
+        <div id="plotMatchResults" class="panel" style="display: none; border-color: #fbbf24;">
+          <div class="panel-head">
+            <h2>
+              Cadastral Plot Area Match
+              <span class="counter-badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24;">
+                Comparison
+              </span>
+            </h2>
+          </div>
+          <div id="plotMatchSummary" class="plot-match-summary" style="margin-top: 8px;"></div>
+          <label class="field-section-label" style="margin-top: 10px; display: block;">Top Candidate Plots</label>
+          <div id="plotMatchCandidates" class="cards" style="margin-top: 6px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <!-- Record Book Panel -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>
+              Land Record Book (Bahi-Khata)
+              <span id="recordBookCount" class="counter-badge">0 Records</span>
+            </h2>
+          </div>
+
+          <!-- Search Register -->
+          <div style="margin-top: 8px;">
+            <input 
+              id="recordBookSearchInput" 
+              type="text" 
+              class="custom-input" 
+              placeholder="Search by owner, village, survey no..." 
+              autocomplete="off"
+            />
+          </div>
+
+          <!-- Export Actions -->
+          <div class="gallery-actions" style="margin-top: 8px; display: flex; gap: 6px;">
+            <button id="btnExportRecordJson" class="btn btn-sm" style="flex: 1;" type="button">
+              📥 JSON
+            </button>
+            <button id="btnExportRecordCsv" class="btn btn-sm" style="flex: 1;" type="button">
+              📊 CSV
+            </button>
+            <button id="btnClearRecords" class="btn btn-sm btn-secondary" style="color: #ef4444;" type="button" title="Clear all stored records">
+              🗑️
+            </button>
+          </div>
+
+          <!-- Records List -->
+          <div id="recordBookItems" class="cards" style="margin-top: 10px; max-height: 280px; overflow-y: auto;">
+            <div class="empty-state">No land records saved yet.</div>
+          </div>
         </div>
       </div>
 

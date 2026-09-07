@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { initScanner } from './scanner.js';
+import { initRecords } from './records.js';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -484,27 +485,26 @@ function setupInteractions() {
     }
   });
 
-  // Mode Tabs Switching
+  // Mode Tabs Switching (3 tabs)
   const tabDSS = $('tabDSS');
   const tabScanner = $('tabScanner');
+  const tabRecords = $('tabRecords');
   const dssContainer = $('dssContainer');
   const scannerContainer = $('scannerContainer');
+  const recordsContainer = $('recordsContainer');
 
-  if (tabDSS && tabScanner && dssContainer && scannerContainer) {
-    tabDSS.addEventListener('click', () => {
-      tabDSS.classList.add('active');
-      tabScanner.classList.remove('active');
-      dssContainer.style.display = 'block';
-      scannerContainer.style.display = 'none';
+  const switchTab = (activeTab, activeContainer) => {
+    [tabDSS, tabScanner, tabRecords].forEach(t => t?.classList.remove('active'));
+    [dssContainer, scannerContainer, recordsContainer].forEach(c => {
+      if (c) c.style.display = 'none';
     });
+    activeTab?.classList.add('active');
+    if (activeContainer) activeContainer.style.display = 'block';
+  };
 
-    tabScanner.addEventListener('click', () => {
-      tabScanner.classList.add('active');
-      tabDSS.classList.remove('active');
-      dssContainer.style.display = 'none';
-      scannerContainer.style.display = 'block';
-    });
-  }
+  tabDSS?.addEventListener('click', () => switchTab(tabDSS, dssContainer));
+  tabScanner?.addEventListener('click', () => switchTab(tabScanner, scannerContainer));
+  tabRecords?.addEventListener('click', () => switchTab(tabRecords, recordsContainer));
 }
 
 // ─── PDF Generation ───────────────────────────────────────────────────────────
@@ -712,6 +712,7 @@ export async function initApp() {
     populateStateSelect(blocks);
     setupInteractions();
     initScanner(state.map, MAPBOX_TOKEN);
+    initRecords(state.map, MAPBOX_TOKEN);
   } catch (err) {
     console.error('Failed to load data:', err);
     if (overlay) {

@@ -414,8 +414,8 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── Mode Tabs ─────────────────────────────────────────── */
 .mode-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
   background: rgba(17, 24, 39, 0.8);
   padding: 4px;
   border-radius: var(--radius);
@@ -717,5 +717,349 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
+}
+
+/* ─── Land Records & OCR Dropzone ────────────────────────── */
+.ocr-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 20px 12px;
+  text-align: center;
+  background: rgba(31, 41, 55, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.ocr-dropzone:hover, .ocr-dropzone.drag-over {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+.dropzone-icon {
+  font-size: 26px;
+  margin-bottom: 2px;
+}
+
+.dropzone-text {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.dropzone-sub {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.ocr-preview-thumb {
+  max-width: 100%;
+  max-height: 110px;
+  border-radius: 4px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+
+.ocr-file-name {
+  font-size: 10px;
+  color: #fbbf24;
+  font-weight: 600;
+  margin-top: 6px;
+  word-break: break-all;
+}
+
+/* ─── Location Banner Chips ──────────────────────────────── */
+.rec-loc-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.loc-tag {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--panel-light);
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+}
+
+.loc-tag.village-tag {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* ─── Record Metadata Grid ───────────────────────────────── */
+.rec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.rec-stat-card {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.rec-stat-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.rec-stat-val {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.field-section-label {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.owners-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-owner {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.liabilities-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.liability-item {
+  font-size: 10px;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 2px solid #ef4444;
+  padding: 4px 6px;
+  border-radius: 0 4px 4px 0;
+}
+
+.rec-summary-text {
+  font-size: 11px;
+  line-height: 1.55;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.6);
+  border-left: 2px solid var(--primary);
+  padding: 6px 8px;
+  border-radius: 0 4px 4px 0;
+  margin: 4px 0 0 0;
+}
+
+.rec-raw-box {
+  background: #020617;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 10px;
+  color: #94a3b8;
+  max-height: 140px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 4px;
+}
+
+/* ─── Match Results & Candidate Cards ────────────────────── */
+.plot-match-summary {
+  background: rgba(251, 191, 36, 0.06);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.match-candidate-card {
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+}
+
+.match-candidate-card:hover {
+  border-color: #fbbf24;
+  background: rgba(31, 41, 55, 0.8);
+}
+
+.match-candidate-card.best-candidate {
+  border-left: 3px solid #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+}
+
+/* ─── Record Book (Bahi-Khata) ────────────────────────────── */
+.record-book-card {
+  padding: 10px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--primary);
+  transition: all 0.2s;
+}
+
+.record-book-card:hover {
+  border-color: var(--primary-hover);
+  background: rgba(31, 41, 55, 0.6);
+}
+
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.rec-owners-row {
+  font-size: 10.5px;
+  color: #93c5fd;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rec-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.rec-area-badge {
+  font-size: 10px;
+  color: #34d399;
+  font-weight: 700;
+}
+
+.rec-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-xs {
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel-light);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn-xs:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.btn-del:hover {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.badge-matched {
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  padding: 1px 6px;
+  border-radius: 99px;
+  cursor: pointer;
+}
+
+.badge-matched:hover {
+  background: #fbbf24;
+  color: #0b0f19;
+}
+
+.badge-unmatched {
+  font-size: 9px;
+  color: var(--muted);
+  background: rgba(156, 163, 175, 0.1);
+  padding: 1px 5px;
+  border-radius: 99px;
+}
+
+/* ─── Cadastral Pulse Map Marker ─────────────────────────── */
+.cadastral-pulse-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.pulse-pin {
+  font-size: 24px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  animation: bouncePin 1.8s infinite ease-in-out;
+}
+
+@keyframes bouncePin {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.pulse-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  background: #0f172a;
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: -2px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* ─── App Toast ──────────────────────────────────────────── */
+.app-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #0f172a;
+  border: 1px solid #3b82f6;
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  transform: translateY(60px);
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.app-toast.visible {
+  transform: translateY(0);
+  opacity: 1;
 }
 
