@@ -316,3 +316,406 @@ select:disabled { opacity: 0.4; cursor: not-allowed; }
 /* ─── Hide Mapbox Logo & Attribution Watermarks ────────── */
 .mapboxgl-ctrl-logo { display: none !important; }
 .mapboxgl-ctrl-attrib { display: none !important; }
+
+/* ─── Mapbox Geocoder (Search Bar) Dark Theme ───────────── */
+.mapboxgl-ctrl-geocoder {
+  background-color: rgba(17, 24, 39, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  color: var(--text) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6) !important;
+  font-family: inherit !important;
+  width: 380px !important;
+  max-width: calc(100vw - 460px) !important;
+  margin-top: 16px !important;
+  margin-left: 16px !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.mapboxgl-ctrl-geocoder:focus-within {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 12px 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+.mapboxgl-ctrl-geocoder--input {
+  color: var(--text) !important;
+  font-size: 13px !important;
+  height: 42px !important;
+  padding: 8px 36px 8px 38px !important;
+}
+
+.mapboxgl-ctrl-geocoder--input:focus {
+  outline: none !important;
+}
+
+.mapboxgl-ctrl-geocoder--input::placeholder {
+  color: #6b7280 !important;
+}
+
+.mapboxgl-ctrl-geocoder--icon-search {
+  fill: #9ca3af !important;
+  top: 11px !important;
+  left: 10px !important;
+}
+
+.mapboxgl-ctrl-geocoder--icon-close {
+  fill: #9ca3af !important;
+  margin-top: 5px !important;
+}
+
+.mapboxgl-ctrl-geocoder--icon-loading {
+  margin-top: 5px !important;
+}
+
+.mapboxgl-ctrl-geocoder .suggestions {
+  background-color: rgba(17, 24, 39, 0.98) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75) !important;
+  margin-top: 6px !important;
+  overflow: hidden !important;
+}
+
+.mapboxgl-ctrl-geocoder .suggestions > li {
+  border-bottom: 1px solid rgba(55, 65, 81, 0.4) !important;
+}
+
+.mapboxgl-ctrl-geocoder .suggestions > li:last-child {
+  border-bottom: none !important;
+}
+
+.mapboxgl-ctrl-geocoder .suggestions > li > a {
+  color: #e5e7eb !important;
+  font-size: 12px !important;
+  padding: 10px 14px !important;
+  transition: background-color 0.15s;
+}
+
+.mapboxgl-ctrl-geocoder .suggestions > .active > a,
+.mapboxgl-ctrl-geocoder .suggestions > li > a:hover {
+  background-color: #1f2937 !important;
+  color: #60a5fa !important;
+}
+
+.mapboxgl-ctrl-geocoder--suggestion-title {
+  font-weight: 600 !important;
+  color: #f3f4f6 !important;
+  font-size: 13px !important;
+}
+
+.mapboxgl-ctrl-geocoder--suggestion-address {
+  color: #9ca3af !important;
+  font-size: 11px !important;
+  margin-top: 2px !important;
+}
+
+/* ─── Mode Tabs ─────────────────────────────────────────── */
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(17, 24, 39, 0.8);
+  padding: 4px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.mode-tab {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 8px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text);
+  background: rgba(31, 41, 55, 0.5);
+}
+
+.mode-tab.active {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+}
+
+/* ─── Dedicated Search & Inputs ──────────────────────────── */
+.search-input-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.custom-input {
+  flex: 1;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  transition: border-color 0.2s;
+}
+
+.custom-input:focus {
+  outline: none;
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 1px #06b6d4;
+}
+
+.custom-textarea {
+  width: 100%;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: 11px;
+  resize: vertical;
+}
+
+.custom-textarea:focus {
+  outline: none;
+  border-color: #06b6d4;
+}
+
+.custom-select {
+  width: 100%;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.quick-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.btn-sm {
+  padding: 6px 10px;
+  font-size: 11px;
+  flex: 1;
+}
+
+.chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-btn {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.chip-btn:hover {
+  background: #374151;
+  border-color: #06b6d4;
+  color: #38bdf8;
+}
+
+/* ─── Grid Parameters ────────────────────────────────────── */
+.param-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.param-grid label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.btn-scan {
+  width: 100%;
+  background: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+  color: #ffffff;
+  border: none;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: var(--radius);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.25);
+  transition: all 0.2s;
+}
+
+.btn-scan:hover:not(:disabled) {
+  background: linear-gradient(135deg, #06b6d4 0%, #0369a1 100%);
+  box-shadow: 0 6px 16px rgba(6, 182, 212, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-scan:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Progress Bar ───────────────────────────────────────── */
+.progress-container {
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  background: var(--panel-light);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #06b6d4, #10b981);
+  transition: width 0.2s ease;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: #38bdf8;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+/* ─── Snapshot Gallery ───────────────────────────────────── */
+.counter-badge {
+  font-size: 10px;
+  background: rgba(6, 182, 212, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-weight: 600;
+}
+
+.snap-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.snap-gallery::-webkit-scrollbar { width: 4px; }
+.snap-gallery::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+.snap-card {
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.snap-card:hover {
+  border-color: #06b6d4;
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.2);
+  transform: translateY(-2px);
+}
+
+.snap-img-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #000000;
+}
+
+.snap-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.snap-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(11, 15, 25, 0.85);
+  backdrop-filter: blur(4px);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.snap-meta {
+  padding: 8px;
+}
+
+.snap-coords {
+  font-size: 10px;
+  color: var(--text);
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.snap-size {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.btn-snap-dl {
+  width: 100%;
+  margin-top: 6px;
+  background: rgba(31, 41, 55, 0.8);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-snap-dl:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+}
+
+.empty-state {
+  grid-column: span 2;
+  text-align: center;
+  padding: 20px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { initScanner } from './scanner.js';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
 const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhaXFpbjA0IiwiYSI6ImNtcmVzdTVsdzAzaXoyenNhcHJpcHZudGwifQ.ENTtBFNPgK9ZaYVxSWYIeA';
@@ -42,6 +43,9 @@ function initMap() {
 
   map.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
   map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-left');
+
+  // Mapbox Geocoder (Global Search Bar)
+  initGeocoder(map);
 
   map.on('load', () => {
     // 3D terrain
@@ -331,6 +335,119 @@ function getBoundaryByBlockId(blockId) {
   return state.boundaries.features.find(f => f.properties?.block_id === blockId) || null;
 }
 
+function selectBlockById(id) {
+  const profile = state.blocks.find(b => b.block_id === id);
+  if (!profile) return;
+
+  state.selectedBlock = profile;
+
+  // Sync cascading dropdowns
+  const stateSel = $('stateSelect');
+  const distSel = $('districtSelect');
+  const blockSel = $('blockSelect');
+
+  if (stateSel.value !== profile.state) {
+    stateSel.value = profile.state;
+    populateDistrictSelect(state.blocks, profile.state);
+  }
+  if (distSel.value !== profile.district) {
+    distSel.value = profile.district;
+    populateBlockSelect(state.blocks, profile.state, profile.district);
+  }
+  blockSel.value = profile.block_id;
+
+  // Map Boundary
+  renderBoundaryOnMap(getBoundaryByBlockId(id));
+
+  // Profile & Challenges
+  renderProfile(profile);
+  renderChallenges(detectChallenges(profile));
+
+  // Scoring
+  const results = scoreAllSchemes(profile, state.schemes);
+  state.lastRecommendations = results;
+  renderRecommendations(results);
+
+  $('downloadPdfBtn').disabled = false;
+}
+
+// ─── Mapbox Geocoder (Global & Local Search) ──────────────────────────────────
+function localGeocoderSearch(query) {
+  if (!query || !state.blocks || state.blocks.length === 0) return [];
+  const q = query.toLowerCase().trim();
+  const matches = [];
+
+  for (const b of state.blocks) {
+    if (
+      b.block_name.toLowerCase().includes(q) ||
+      b.district.toLowerCase().includes(q) ||
+      b.state.toLowerCase().includes(q)
+    ) {
+      const boundary = getBoundaryByBlockId(b.block_id);
+      let center = [78.9629, 20.5937];
+      if (boundary && boundary.properties && boundary.properties.center_lng && boundary.properties.center_lat) {
+        center = [boundary.properties.center_lng, boundary.properties.center_lat];
+      }
+      matches.push({
+        id: b.block_id,
+        type: 'Feature',
+        text: b.block_name,
+        place_name: `📍 ${b.block_name}, ${b.district}, ${b.state} (Tribal Profile)`,
+        place_type: ['place'],
+        center: center,
+        geometry: {
+          type: 'Point',
+          coordinates: center,
+        },
+        properties: {
+          block_id: b.block_id,
+          isGeoAdhikarBlock: true,
+        },
+      });
+    }
+  }
+  return matches.slice(0, 5);
+}
+
+function initGeocoder(map) {
+  if (!window.MapboxGeocoder) {
+    console.warn('MapboxGeocoder plugin not loaded yet.');
+    return;
+  }
+
+  const geocoder = new window.MapboxGeocoder({
+    accessToken: mapboxgl.accessToken,
+    mapboxgl: mapboxgl,
+    marker: {
+      color: '#3b82f6',
+    },
+    placeholder: 'Search any city, district, landmark in India...',
+    countries: 'in',
+    localGeocoder: localGeocoderSearch,
+    localGeocoderOnly: false,
+    zoom: 12,
+  });
+
+  map.addControl(geocoder, 'top-left');
+
+  geocoder.on('result', (e) => {
+    const result = e.result;
+    if (result.properties?.block_id) {
+      selectBlockById(result.properties.block_id);
+    } else {
+      const q = (result.text || result.place_name || '').toLowerCase();
+      const matched = state.blocks.find(b =>
+        q.includes(b.block_name.toLowerCase()) ||
+        b.block_name.toLowerCase().includes(q) ||
+        q.includes(b.district.toLowerCase())
+      );
+      if (matched) {
+        selectBlockById(matched.block_id);
+      }
+    }
+  });
+}
+
 function setupInteractions() {
   const stateSel = $('stateSelect');
   const distSel = $('districtSelect');
@@ -350,25 +467,7 @@ function setupInteractions() {
   blockSel.addEventListener('change', () => {
     const id = blockSel.value;
     if (!id) { clearPanels(); return; }
-
-    const profile = state.blocks.find(b => b.block_id === id);
-    state.selectedBlock = profile || null;
-
-    if (!profile) return;
-
-    // Map
-    renderBoundaryOnMap(getBoundaryByBlockId(id));
-
-    // Profile & Challenges
-    renderProfile(profile);
-    renderChallenges(detectChallenges(profile));
-
-    // Scoring
-    const results = scoreAllSchemes(profile, state.schemes);
-    state.lastRecommendations = results;
-    renderRecommendations(results);
-
-    downloadBtn.disabled = false;
+    selectBlockById(id);
   });
 
   // PDF download
@@ -384,6 +483,28 @@ function setupInteractions() {
       downloadBtn.textContent = 'Download Report';
     }
   });
+
+  // Mode Tabs Switching
+  const tabDSS = $('tabDSS');
+  const tabScanner = $('tabScanner');
+  const dssContainer = $('dssContainer');
+  const scannerContainer = $('scannerContainer');
+
+  if (tabDSS && tabScanner && dssContainer && scannerContainer) {
+    tabDSS.addEventListener('click', () => {
+      tabDSS.classList.add('active');
+      tabScanner.classList.remove('active');
+      dssContainer.style.display = 'block';
+      scannerContainer.style.display = 'none';
+    });
+
+    tabScanner.addEventListener('click', () => {
+      tabScanner.classList.add('active');
+      tabDSS.classList.remove('active');
+      dssContainer.style.display = 'none';
+      scannerContainer.style.display = 'block';
+    });
+  }
 }
 
 // ─── PDF Generation ───────────────────────────────────────────────────────────
@@ -590,6 +711,7 @@ export async function initApp() {
 
     populateStateSelect(blocks);
     setupInteractions();
+    initScanner(state.map, MAPBOX_TOKEN);
   } catch (err) {
     console.error('Failed to load data:', err);
     if (overlay) {

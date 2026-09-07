@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "leaflet": "^1.9.4",
+    "@turf/turf": "^7.4.0",
+    "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
-    "html2canvas": "^1.4.1"
+    "jszip": "^3.10.1",
+    "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "vite": "^5.4.0"

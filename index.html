@@ -12,6 +12,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js"></script>
+  <!-- Mapbox GL Geocoder Plugin -->
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
 </head>
 
 <body>
@@ -29,50 +32,226 @@
         </div>
       </div>
 
-      <!-- Location Selector -->
-      <div class="panel">
-        <h2>
-          Location Selection
-          <span class="status-badge">
-            <span class="status-dot"></span>
-            Live Bound
-          </span>
-        </h2>
-        <label for="stateSelect">State</label>
-        <select id="stateSelect" aria-label="Select State">
-          <option value="">Select State</option>
-        </select>
-
-        <label for="districtSelect">District</label>
-        <select id="districtSelect" aria-label="Select District" disabled>
-          <option value="">Select District</option>
-        </select>
-
-        <label for="blockSelect">City / Tribal Area</label>
-        <select id="blockSelect" aria-label="Select Area" disabled>
-          <option value="">Select Area</option>
-        </select>
+      <!-- Navigation Mode Tabs -->
+      <div class="mode-tabs">
+        <button id="tabDSS" class="mode-tab active" type="button">
+          <span>🌐</span> Scheme Prioritization
+        </button>
+        <button id="tabScanner" class="mode-tab" type="button">
+          <span>🛰️</span> Plot Snapshot Scanner
+        </button>
       </div>
 
-      <!-- Area Profile -->
-      <div id="profilePanel" class="panel">
-        <div class="panel-head">
-          <h2>Area Profile</h2>
-          <button id="downloadPdfBtn" class="btn" disabled>Download Report</button>
+      <!-- ── View 1: Scheme Decision Support System ─────────────── -->
+      <div id="dssContainer" class="mode-view active">
+        <!-- Location Selector -->
+        <div class="panel">
+          <h2>
+            Location Selection
+            <span class="status-badge">
+              <span class="status-dot"></span>
+              Live Bound
+            </span>
+          </h2>
+          <label for="stateSelect">State</label>
+          <select id="stateSelect" aria-label="Select State">
+            <option value="">Select State</option>
+          </select>
+
+          <label for="districtSelect">District</label>
+          <select id="districtSelect" aria-label="Select District" disabled>
+            <option value="">Select District</option>
+          </select>
+
+          <label for="blockSelect">City / Tribal Area</label>
+          <select id="blockSelect" aria-label="Select Area" disabled>
+            <option value="">Select Area</option>
+          </select>
         </div>
-        <div id="profileList" class="cards" style="margin-top: 10px;"></div>
+
+        <!-- Area Profile -->
+        <div id="profilePanel" class="panel">
+          <div class="panel-head">
+            <h2>Area Profile</h2>
+            <button id="downloadPdfBtn" class="btn" disabled>Download Report</button>
+          </div>
+          <div id="profileList" class="cards" style="margin-top: 10px;"></div>
+        </div>
+
+        <!-- Key Challenges -->
+        <div id="challengesPanel" class="panel">
+          <h2>Identified Challenges</h2>
+          <ul id="challengesList" class="chips"></ul>
+        </div>
+
+        <!-- Recommended Schemes -->
+        <div id="recoPanel" class="panel">
+          <h2>Prioritized Scheme Interventions</h2>
+          <div id="recommendations" class="cards"></div>
+        </div>
       </div>
 
-      <!-- Key Challenges -->
-      <div id="challengesPanel" class="panel">
-        <h2>Identified Challenges</h2>
-        <ul id="challengesList" class="chips"></ul>
-      </div>
+      <!-- ── View 2: AI Plot Snapshot Scanner ──────────────────── -->
+      <div id="scannerContainer" class="mode-view" style="display: none;">
+        <!-- Dedicated Snapshot Location Search -->
+        <div class="panel">
+          <h2>
+            Snapshot Target Location
+            <span class="status-badge" style="color: #06b6d4; background: rgba(6, 182, 212, 0.1); border-color: rgba(6, 182, 212, 0.2);">
+              <span class="status-dot" style="background: #06b6d4;"></span>
+              Dedicated Search
+            </span>
+          </h2>
 
-      <!-- Recommended Schemes -->
-      <div id="recoPanel" class="panel">
-        <h2>Prioritized Scheme Interventions</h2>
-        <div id="recommendations" class="cards"></div>
+          <div class="search-input-group">
+            <input 
+              id="scannerSearchInput" 
+              type="text" 
+              class="custom-input" 
+              placeholder="Search area, landmark, or lat, lng..." 
+              autocomplete="off"
+            />
+            <button id="btnScannerSearch" class="btn btn-primary" type="button">Find</button>
+          </div>
+
+          <div class="quick-actions-row">
+            <button id="btnUseMapCenter" class="btn btn-secondary btn-sm" type="button">📍 Use Map Center</button>
+            <button id="btnPickOnMap" class="btn btn-secondary btn-sm" type="button">🎯 Pick on Map</button>
+          </div>
+
+          <label style="margin-top: 12px; display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 600;">
+            Quick Presets
+          </label>
+          <div id="scannerPresets" class="chips-container" style="margin-top: 6px;"></div>
+
+          <!-- Collapsible JSON Input -->
+          <details class="json-details" style="margin-top: 14px;">
+            <summary style="cursor: pointer; font-size: 11px; color: var(--primary); font-weight: 600;">
+              ⚙️ Paste Location JSON
+            </summary>
+            <div style="margin-top: 8px;">
+              <textarea 
+                id="scannerJsonInput" 
+                class="custom-textarea" 
+                rows="4" 
+                placeholder='{"latitude": 23.8315, "longitude": 91.2868, "name": "Plot Centroid"}'
+              ></textarea>
+              <button id="btnParseJson" class="btn btn-sm btn-secondary" style="margin-top: 6px; width: 100%;">
+                ⚡ Parse &amp; Set Centroid
+              </button>
+            </div>
+          </details>
+        </div>
+
+        <!-- Grid & Resolution Parameters -->
+        <div class="panel">
+          <h2>Grid &amp; Tiling Parameters</h2>
+          <div class="param-grid">
+            <div>
+              <label for="scannerBigSize">Big Square (AOI)</label>
+              <select id="scannerBigSize" class="custom-select">
+                <option value="100" selected>100m × 100m (1 Hectare)</option>
+                <option value="250">250m × 250m (~6 Hectares)</option>
+                <option value="500">500m × 500m (25 Hectares / Farm Belt)</option>
+                <option value="1000">1,000m × 1,000m (1 sq km)</option>
+                <option value="2000">2,000m × 2,000m (Full Village Zone)</option>
+              </select>
+            </div>
+            <div>
+              <label for="scannerMiniSize">Mini-Square (Patch)</label>
+              <select id="scannerMiniSize" class="custom-select">
+                <option value="25" selected>25m × 25m (Individual Plot)</option>
+                <option value="50">50m × 50m (Medium Plot)</option>
+                <option value="100">100m × 100m (Field Cluster)</option>
+                <option value="200">200m × 200m (Sub-Sector)</option>
+              </select>
+            </div>
+          </div>
+
+          <button id="btnStartScan" class="btn btn-scan" type="button">
+            🚀 Generate Grid &amp; Capture High-Res Snaps
+          </button>
+
+          <!-- Progress Bar -->
+          <div id="scannerProgress" class="progress-container" style="display: none; margin-top: 12px;">
+            <div class="progress-track">
+              <div id="scannerProgressBar" class="progress-bar"></div>
+            </div>
+            <div id="scannerProgressText" class="progress-text">Initializing patch capture...</div>
+          </div>
+        </div>
+
+        <!-- Snapshot Gallery & Export -->
+        <div class="panel">
+          <div class="panel-head">
+            <h2>
+              Captured Snapshots
+              <span id="scannerSnapCount" class="counter-badge">0 Patches</span>
+            </h2>
+          </div>
+
+          <div id="scannerActions" class="gallery-actions" style="display: none; margin-top: 10px; flex-direction: column; gap: 8px;">
+            <button id="btnRunSegmentation" class="btn btn-scan" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-weight: 700;" type="button">
+              🧠 Run SAM Model on Snapshots
+            </button>
+            <button id="btnDownloadZip" class="btn btn-accent" style="font-weight: 600;" type="button">
+              💾 Download All Snapshots (ZIP)
+            </button>
+          </div>
+
+          <div id="scannerGallery" class="snap-gallery" style="margin-top: 12px;">
+            <div class="empty-state">No snapshots captured yet. Configure location above and click Start Scan.</div>
+          </div>
+        </div>
+
+        <!-- AI Plot Segmentation Results Panel -->
+        <div id="segmentationPanel" class="panel" style="display: none;">
+          <div class="panel-head">
+            <h2>
+              Segmented Land Plots (SAM)
+              <span id="segmentedPlotsCount" class="counter-badge">0 Plots</span>
+            </h2>
+          </div>
+
+          <!-- Segmentation Progress -->
+          <div id="segProgress" class="progress-container" style="display: none; margin-top: 10px;">
+            <div class="progress-track">
+              <div id="segProgressBar" class="progress-bar" style="background: linear-gradient(90deg, #10b981, #059669);"></div>
+            </div>
+            <div id="segProgressText" class="progress-text">Delineating plot boundaries...</div>
+          </div>
+
+          <!-- Plot Stats Overview -->
+          <div id="plotStatsOverview" class="param-grid" style="display: none; margin-top: 10px;">
+            <div class="card" style="padding: 8px;">
+              <div class="meta">Total Plots</div>
+              <div id="statTotalPlots" class="value-num" style="font-size: 16px; color: #10b981;">0</div>
+            </div>
+            <div class="card" style="padding: 8px;">
+              <div class="meta">Total Area</div>
+              <div id="statTotalArea" class="value-num" style="font-size: 16px; color: #38bdf8;">0 ha</div>
+            </div>
+          </div>
+
+          <!-- Plot Export Actions -->
+          <div id="plotExportActions" class="gallery-actions" style="display: none; margin-top: 8px; gap: 8px;">
+            <button id="btnExportPlotsGeoJson" class="btn btn-sm" style="flex: 1;" type="button">
+              🗺️ Export GeoJSON
+            </button>
+            <button id="btnExportPlotsCsv" class="btn btn-sm" style="flex: 1;" type="button">
+              📊 Export CSV
+            </button>
+          </div>
+
+          <!-- Selected Plot Details Card -->
+          <div id="selectedPlotCard" class="card" style="display: none; margin-top: 10px; border-color: var(--primary);">
+            <div class="meta" id="selectedPlotTitle">Plot Details</div>
+            <div id="selectedPlotBody" style="font-size: 11px; margin-top: 4px; line-height: 1.6;"></div>
+          </div>
+
+          <!-- Segmented Plots List -->
+          <div id="plotsList" class="cards" style="margin-top: 10px; max-height: 240px; overflow-y: auto;"></div>
+        </div>
       </div>
 
       <!-- Data Sources Footer 
