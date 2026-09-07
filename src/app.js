@@ -3,7 +3,7 @@ import html2canvas from 'html2canvas';
 import { initScanner } from './scanner.js';
 
 // ─── Config ─────────────────────────────────────────────────────────────────
-const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2hhaXFpbjA0IiwiYSI6ImNtcmVzdTVsdzAzaXoyenNhcHJpcHZudGwifQ.ENTtBFNPgK9ZaYVxSWYIeA';
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
