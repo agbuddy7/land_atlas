@@ -7,6 +7,8 @@ import base64
 import traceback
 import urllib.request
 import urllib.parse
+import sqlite3
+import hashlib
 from typing import List, Optional
 import numpy as np
 from PIL import Image
@@ -741,6 +743,90 @@ def geocode_record(req: GeocodeRecordRequest):
         "bbox": [73.8167, 18.4804, 73.8967, 18.5604],
         "message": "Mapbox geocoding failed or token missing, defaulted to region center."
     }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECURE DATABASE (SQLite + SHA256 Integrity)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def init_db():
+    conn = sqlite3.connect("land_records.db")
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            record_id TEXT UNIQUE,
+            data TEXT,
+            data_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Run DB Init
+init_db()
+
+def compute_hash(data_str: str) -> str:
+    return hashlib.sha256(data_str.encode('utf-8')).hexdigest()
+
+class SaveRecordRequest(BaseModel):
+    record_id: str
+    data: dict
+
+@app.post("/save-record")
+def save_record(req: SaveRecordRequest):
+    data_str = json.dumps(req.data, sort_keys=True)
+    data_hash = compute_hash(data_str)
+
+    try:
+        conn = sqlite3.connect("land_records.db")
+        c = conn.cursor()
+        c.execute(
+            "INSERT OR REPLACE INTO records (record_id, data, data_hash) VALUES (?, ?, ?)",
+            (req.record_id, data_str, data_hash)
+        )
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": "Record securely saved with SHA-256 integrity seal."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/records")
+def get_records():
+    conn = sqlite3.connect("land_records.db")
+    c = conn.cursor()
+    c.execute("SELECT record_id, data, data_hash, created_at FROM records")
+    rows = c.fetchall()
+    conn.close()
+
+    results = []
+    for row in rows:
+        record_id, data_str, stored_hash, created_at = row
+        current_hash = compute_hash(data_str)
+        is_tampered = (stored_hash != current_hash)
+        
+        try:
+            data = json.loads(data_str)
+        except:
+            data = {"error": "Invalid JSON data stored"}
+            is_tampered = True # if it can't parse, it's definitely tampered or broken
+
+        results.append({
+            "record_id": record_id,
+            "data": data,
+            "created_at": created_at,
+            "is_tampered": is_tampered
+        })
+    return {"success": True, "records": results}
+
+@app.delete("/records/{record_id}")
+def delete_record(record_id: str):
+    conn = sqlite3.connect("land_records.db")
+    c = conn.cursor()
+    c.execute("DELETE FROM records WHERE record_id = ?", (record_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 if __name__ == "__main__":
     import uvicorn

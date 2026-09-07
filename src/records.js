@@ -10,21 +10,59 @@ let recordLocationMarker = null;
 const STORAGE_KEY = 'geoadhikar_land_records';
 
 // ─── Record Book Storage Helpers ─────────────────────────────────────────────
-export function getStoredRecords() {
+let cachedRecords = [];
+
+export async function fetchStoredRecords() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const res = await fetch('http://127.0.0.1:8000/records');
+    const data = await res.json();
+    if (data.success) {
+      // Map API records to local format
+      cachedRecords = data.records.map(r => ({
+        id: r.record_id,
+        ...r.data,
+        created_at: r.created_at,
+        is_tampered: r.is_tampered
+      }));
+    }
+    return cachedRecords;
   } catch (e) {
-    console.error('Failed to parse stored records:', e);
+    console.error('Failed to fetch records from SQLite:', e);
     return [];
   }
 }
 
-export function saveStoredRecords(records) {
+export function getStoredRecords() {
+  return cachedRecords;
+}
+
+export async function saveRecordToBook(record) {
+  const recordId = `REC_${Date.now().toString().slice(-6)}`;
+  
+  // Augment record with matched plot if any
+  const dataToSave = {
+    ...record,
+    matched_plot_id: record.matched_plot_id || (currentMatchedPlot ? currentMatchedPlot.plot_id : null),
+  };
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    const res = await fetch('http://127.0.0.1:8000/save-record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        record_id: recordId,
+        data: dataToSave
+      })
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast(`✅ Saved to Secure SQLite DB (${recordId})`);
+      await fetchStoredRecords();
+      renderRecordBook();
+    }
   } catch (e) {
-    console.error('Failed to save records to localStorage:', e);
+    console.error('Failed to save to SQLite:', e);
+    showToast('❌ Failed to save to database');
   }
 }
 
@@ -311,47 +349,22 @@ export function displayExtractedRecord(record) {
 }
 
 // ─── Record Book Storage & Table Rendering ────────────────────────────────────
-export function saveRecordToBook(record) {
-  const records = getStoredRecords();
-
-  const recordEntry = {
-    id: `REC_${Date.now().toString().slice(-6)}`,
-    created_at: new Date().toISOString(),
-    village: record.village || 'N/A',
-    taluka_or_tehsil: record.taluka_or_tehsil || 'N/A',
-    district: record.district || 'N/A',
-    state: record.state || 'N/A',
-    survey_or_gat_no: record.survey_or_gat_no || 'N/A',
-    khata_no: record.khata_no || 'N/A',
-    total_area: record.total_area || 'N/A',
-    parsed_area_sqm: record.parsed_area_sqm || null,
-    owners: record.owners || [],
-    liabilities_or_loans: record.liabilities_or_loans || [],
-    summary: record.summary || '',
-    matched_plot_id: record.matched_plot_id || (currentMatchedPlot ? currentMatchedPlot.plot_id : null),
-    ai_provider: record.ai_provider || 'AI Vision'
-  };
-
-  // Add to top of list
-  records.unshift(recordEntry);
-  saveStoredRecords(records);
-  renderRecordBook();
-
-  showToast(`✅ Saved to Record Book (${recordEntry.id})`);
+export async function deleteRecordFromBook(recordId) {
+  try {
+    const res = await fetch(`http://127.0.0.1:8000/records/${recordId}`, { method: 'DELETE' });
+    if (res.ok) {
+      showToast('🗑️ Record deleted');
+      await fetchStoredRecords();
+      renderRecordBook();
+    }
+  } catch (e) {
+    console.error('Failed to delete record:', e);
+  }
 }
 
-export function deleteRecordFromBook(recordId) {
-  const records = getStoredRecords().filter(r => r.id !== recordId);
-  saveStoredRecords(records);
-  renderRecordBook();
-  showToast('🗑️ Record deleted');
-}
-
-export function clearRecordBook() {
-  if (confirm('Are you sure you want to clear all saved land records?')) {
-    localStorage.removeItem(STORAGE_KEY);
-    renderRecordBook();
-    showToast('Record book cleared');
+export async function clearRecordBook() {
+  if (confirm('Database clearing is disabled for security. Delete records individually.')) {
+    // Left empty on purpose
   }
 }
 
@@ -365,9 +378,9 @@ export function renderRecordBook(filterQuery = '') {
   if (filterQuery.trim()) {
     const q = filterQuery.toLowerCase().trim();
     records = records.filter(r =>
-      r.village.toLowerCase().includes(q) ||
-      r.district.toLowerCase().includes(q) ||
-      r.survey_or_gat_no.toLowerCase().includes(q) ||
+      (r.village && r.village.toLowerCase().includes(q)) ||
+      (r.district && r.district.toLowerCase().includes(q)) ||
+      (r.survey_or_gat_no && r.survey_or_gat_no.toLowerCase().includes(q)) ||
       (r.owners && r.owners.some(o => o.toLowerCase().includes(q))) ||
       (r.matched_plot_id && r.matched_plot_id.toLowerCase().includes(q))
     );
@@ -386,9 +399,12 @@ export function renderRecordBook(filterQuery = '') {
     const matchedBadge = r.matched_plot_id
       ? `<span class="badge-matched" data-plot="${r.matched_plot_id}">🔗 Plot ${r.matched_plot_id}</span>`
       : `<span class="badge-unmatched">Unlinked</span>`;
+    
+    const tamperBadge = r.is_tampered ? `<div style="background:#ef4444; color:white; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:bold; margin-bottom:4px; display:inline-block;">⚠️ TAMPERED (Hash Mismatch)</div>` : '';
 
     return `
-      <div class="card record-book-card" data-rec-id="${r.id}">
+      <div class="card record-book-card" data-rec-id="${r.id}" style="${r.is_tampered ? 'border: 1px solid #ef4444;' : ''}">
+        ${tamperBadge}
         <div class="rec-header">
           <div>
             <strong style="font-size:13px; color:var(--text);">${r.village}, ${r.district}</strong>
@@ -680,14 +696,15 @@ export function initRecords(map, token) {
     renderRecordBook(e.target.value);
   });
 
-  // Initial render of saved records
-  renderRecordBook();
-
-  // If there are existing records, pre-populate if requested
-  const stored = getStoredRecords();
-  if (stored.length === 0) {
-    // Save sample record by default for immediate exploration
-    saveStoredRecords([SAMPLE_RECORD]);
-    renderRecordBook();
-  }
+  // Initial fetch and render
+  fetchStoredRecords().then(() => {
+    const stored = getStoredRecords();
+    if (stored.length === 0) {
+      // Save sample record by default for immediate exploration
+      saveRecordToBook(SAMPLE_RECORD);
+    } else {
+      renderRecordBook();
+    }
+  });
 }
+
